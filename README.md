@@ -28,3 +28,6 @@ We use the package `pystache` to format our data as html, and pystache makes tha
 
 ## report_bug
 This method, who would've thought, reports our bugs.
+
+## Important Notes:
+If you would like to use this in your own pipeline or projects, make sure you export `CREATE_BUG_REPORT` into the system environment and set it either to `True` or `False` *(case sensitive)*. By default automated bug-creation is turned off.
