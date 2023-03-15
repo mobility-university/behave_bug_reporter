@@ -71,7 +71,6 @@ parameters:
         # Export Secrets (yours, not these ones :D)
         export some_secret=SUPERSECRETKEY1
         export another_secret=SUPERSECRETKEY2
-        export environment=${{ environment }}
 
         # Settings for automated bugreports
         export CREATE_BUG_REPORT=$(CREATE_BUG_REPORT) # env
