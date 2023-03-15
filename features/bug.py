@@ -1,60 +1,96 @@
-from enum import Enum
 import json
-import pystache
+from enum import Enum
 from subprocess import check_output
 
-
-class SeverityLevel(Enum):
-    LOW = "1 = low"
-    MEDIUM = "2 = medium"
-    HIGH = "3 = high"
-    CRITICAL = "4 = critical"
+import pystache
+from behave import model
 
 
 class BugReport:
-    def __init__(self, scenario, error_type, traceback, **kwargs) -> None:
+    def __init__(self, /, scenario, error_type, traceback, versions) -> None:
         self.scenario = scenario
         self.error_type = error_type
         self.traceback = traceback
-        self.versions = kwargs.get("versions", {})
+        self.versions = versions
 
     def prettify(self, template=None):
         if template is None:
-            template = "<h3>Scenario: {{ scenario_name}}</h3>Error: {{ error_type }}<br>Log:<br><fontⶩcolor='red'>{{ traceback }}</font>"
-        data = {
-            "scenario_name": self.scenario.name,
-            "error_type": self.error_type.__name__,
-            "traceback": self.traceback,
-        }
+            template = "<h3>Scenario: {{ scenario_name }}</h3>Error: {{ error_type }}<br>Log:<br><fontⶩcolor='red'>{{ traceback }}</font>"
         return (
-            pystache.render(template, **data)
+            pystache.render(
+                template,
+                scenario_name=self.scenario.name,
+                error_type=self.error_type.__name__,
+                traceback=self.traceback,
+            )
             .replace(" ", "&nbsp;")
             .replace("\n", "<br>")
             .replace("ⶩ", " ")
         )
 
-    def _create_list(self, list, template=None):
-        """
-        When providing a template make sure to use the 'steps' keyword to access all the data
-        """
-        if template is None:
-            template = """<ul>{{#steps}}<li>{{.}}</li>{{/steps}}</ul>"""
-        data = {
-            "steps": list,
-        }
-        return pystache.render(template, **data)
-
     def repro_steps(self, template=None):
-        return self._create_list(self.scenario.steps, template=template)
+        repro = []
+        for step in self.scenario.steps:
+            repro.append(f"<li>{step.keyword} {step.name}</li>")
+            if step.table:
+                repro.append(convert_table(step.table))
 
-    def get_versions(self, template=None, seperator=" - "):
-        return self._create_list(
-            [f"{k}{seperator}{v}" for k, v in self.versions.items()], template=template
+        repro.append("</html>")
+        return create_list(content=repro, template=template)
+
+    def get_versions(self, separator=" - "):
+        return create_list(
+            [f"{k}{separator}{v}" for k, v in self.versions.items()],
+            template="{{#steps}}<li>{{.}}</li>{{/steps}}",
         )
 
 
-def report_bug(bug: BugReport, severity: SeverityLevel, assignee="", tags=None):
-    """This won't work btw, just an example"""  
+def create_list(content, template=None):
+    """
+    Converts a behave.model.Table into a html table.
+    When providing a template make sure to use the 'steps' keyword to access data
+    >>> create_list(["A", "B"], template="{{#steps}}<li>{{.}}</li>{{/steps}}")
+    '<li>A</li><li>B</li>'
+    """
+    if template is None:
+        template = """{{#steps}}{{.}}{{/steps}}"""
+    return (
+        pystache.render(
+            template,
+            steps=content,
+        )
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+    )
+
+
+def convert_table(input_table: model.Table):
+    """
+    >>> convert_table(model.Table(headings=["A", "B"], rows=[["Q", "W"], ["E", "R"]]))
+    '<table><tr><th>A</th><th>B</th></tr><tr><td>Q</td><td>W</td></tr><tr><td>E</td><td>R</td></tr></table>'
+    """
+    template = "<table><tr>{{#headings}}<th>{{.}}</th>{{/headings}}</tr>{{#rows}}<tr>{{#.}}<td>{{.}}</td>{{/.}}</tr>{{/rows}}</table>"
+    return pystache.render(
+        template,
+        headings=input_table.headings,
+        rows=[row.cells for row in input_table],
+    )
+
+
+def report_bug(
+    bugreport: BugReport,
+    severity="1 = low",
+    assignee="",
+    tags=None,
+):
+    """
+    Report a bug to Azure DevOps
+    bugreport: BugReport object containing the information about the error and where it occurred
+    severity: SeverityLevel object containing the severity of the bug (LOW, MEDIUM, HIGH, CRITICAL)
+        Convention: '1 = low', '2 = medium', etc.
+    assignee: The person you want to associate the bugreport with (either name or email <- please use email ;))
+    tags: List of tags to add to the bug report (Automated, Test, Foo, Bar, ...)
+    """
     result = check_output(
         [
             "az",
@@ -62,27 +98,25 @@ def report_bug(bug: BugReport, severity: SeverityLevel, assignee="", tags=None):
             "work-item",
             "create",
             "--title",
-            bug.scenario.name,
+            bugreport.scenario.name,
             "--assigned-to",
             assignee,
             "--type",
             "Bug",
             "--organization",
-            "https://secret.azure.com/",
+            "https://dev.azure.com/vwac/",
             "--project",
-            "1234-5678-9012-3456",
+            "756288e9-a9e7-410e-ab1f-0a734e0e8145",
             "--description",
-            bug.prettify(),
+            bugreport.prettify(),
             "--fields",
-            f"Severity={severity.value}",
-            f"Repro Steps={bug.repro_steps()}",
+            f"Severity={severity}",
+            f"Repro Steps=<style>table, th, td {{ border: 1px solid black; border-collapse: collapse;}}</style>{bugreport.repro_steps()}",
             f"System.Tags={';'.join(tags if tags else [])}",
-            f"System Info={bug.versions()}",
+            f"System Info={bugreport.get_versions()}",
         ]
     )
-    result_string = result.decode()
-    js = json.loads(result_string)
+
+    js = json.loads(result.decode())
     bugreport_id = js["id"]
-    print(
-        f" - {bug.scenario.name} | {tags if tags else ''} > {f'https://www.watch_my_bugreport.com/{bugreport_id}'}"
-    )
+    return f"https://dev.azure.com/vwac/Data%20Collection/_workitems/edit/{bugreport_id}/#/'"

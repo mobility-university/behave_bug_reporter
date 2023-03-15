@@ -1,7 +1,9 @@
-from behave.model_core import Status
-from features.bug import BugReport, report_bug
-import traceback
 import os
+import traceback
+
+from behave.model_core import Status
+
+from features.bug import BugReport, report_bug
 
 bug_reports = []
 
@@ -30,9 +32,9 @@ def after_scenario(context, scenario):
     error_descr = context.exception["traceback"]
     bug_reports.append(
         BugReport(
-            scenario,
-            error_type,
-            error_descr,
+            scenario=scenario,
+            error_type=error_type,
+            traceback=error_descr,
             versions={"youtube": "7.8.2", "github": "1.2.3"},
         )
     )
