@@ -116,7 +116,6 @@ def report_bug(
             f"System Info={bugreport.get_versions()}",
         ]
     )
-
     js = json.loads(result.decode())
     bugreport_id = js["id"]
     return f"https://dev.azure.com/vwac/Data%20Collection/_workitems/edit/{bugreport_id}/#/'"

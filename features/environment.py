@@ -28,14 +28,12 @@ def after_scenario(context, scenario):
         return
 
     # Report Bug!
-    error_type = type(context.exception["exception"])
-    error_descr = context.exception["traceback"]
     bug_reports.append(
         BugReport(
             scenario=scenario,
-            error_type=error_type,
-            traceback=error_descr,
-            versions={"youtube": "7.8.2", "github": "1.2.3"},
+            error_type=type(context.exception["exception"]),
+            traceback=context.exception["traceback"],
+            versions={"youtube": "7.8.2", "github": "1.2.3"},  # impl. your logic here!
         )
     )
 
@@ -44,8 +42,4 @@ def after_all(context):
     if os.environ.get("CREATE_BUG_REPORT", "False") == "True":
         print("Creating Bug Reports...")
         for r in bug_reports:
-            print(r.prettify())
-            print()
-            print(r.repro_steps())
-            print(r.get_versions())
-            # report_bug(r)
+            report_bug(r)
