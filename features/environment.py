@@ -5,7 +5,10 @@ from behave.model_core import Status
 
 from features.bug import BugReport, report_bug
 
-bug_reports = []
+
+def before_all(context):
+    assert "generated_reports" not in dir(context)
+    context.generated_reports = []
 
 
 def before_scenario(context, scenario):
@@ -28,18 +31,21 @@ def after_scenario(context, scenario):
         return
 
     # Report Bug!
-    bug_reports.append(
-        BugReport(
-            scenario=scenario,
-            error_type=type(context.exception["exception"]),
-            traceback=context.exception["traceback"],
-            versions={"youtube": "7.8.2", "github": "1.2.3"},  # impl. your logic here!
+    if os.environ.get("CREATE_BUG_REPORT", "False") == "True":
+        link = report_bug(
+            BugReport(
+                scenario=scenario,
+                error_type=type(context.exception["exception"]),
+                traceback=context.exception["traceback"],
+                versions={
+                    "youtube": "7.8.2",
+                    "github": "1.2.3",
+                },  # impl. your logic here!
+            )
         )
-    )
+        context.generated_reports.append(link)
 
 
 def after_all(context):
-    if os.environ.get("CREATE_BUG_REPORT", "False") == "True":
-        print("Creating Bug Reports...")
-        for r in bug_reports:
-            report_bug(r)
+    for report in context.generated_reports:
+        print(report)
