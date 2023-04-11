@@ -1,9 +1,9 @@
-from behave import given, when, then
+from behave import given, then, when
 
 
-@given('an innocent step in background')
+@given("an innocent step in background")
 def background(context):
-    ...
+    assert True
 
 
 @given('this steps outputs "{message}"')
@@ -11,11 +11,11 @@ def step_impl(context, message):
     print(message)
 
 
-@when('this step fails')
+@when("this step fails")
 def step_impl(context):
     assert False
 
-@then('not reached here')
+
+@then("not reached here")
 def a(context):
-    import sys
-    sys.exit(-1)
+    assert False
